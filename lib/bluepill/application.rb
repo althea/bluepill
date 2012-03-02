@@ -183,14 +183,15 @@ module Bluepill
             $stderr.puts "#{e.class}: #{e.message}"
             exit(4) unless e.is_a?(Errno::ESRCH)
           else
-            10.times do |i|
-              sleep 0.5
-              break unless System.pid_alive?(previous_pid)
-            end
-
+            wait_for_process(previous_pid)
             if System.pid_alive?(previous_pid)
-              $stderr.puts "Previous bluepilld[#{previous_pid}] didn't die"
-              exit(4)
+              $stderr.puts "Previous bluepilld[#{previous_pid}] did not die in the first attempt so force killing"
+              ::Process.kill(9, previous_pid)
+              wait_for_process(previous_pid)
+              if System.pid_alive?(previous_pid)
+                $stderr.puts "Previous bluepilld[#{previous_pid}] didn't die"
+                exit(4)
+              end
             end
           end
         end
@@ -199,6 +200,13 @@ module Bluepill
 
     def write_pid_file
       File.open(self.pid_file, 'w') { |x| x.write(::Process.pid) }
+    end
+
+    def wait_for_process(pid)
+      10.times do |i|
+        sleep 0.5
+        return unless System.pid_alive?(pid)
+      end
     end
   end
 end
